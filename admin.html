@@ -98,6 +98,7 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth(); // 💡 해결 핵심 1: 인증 모듈 스위치 켜기!
 
         // 클럽 인증
         const clubId = localStorage.getItem('clubId');
@@ -105,7 +106,6 @@
         if (!clubId) { window.location.href = "index.html"; }
         document.getElementById('dynamic-club-name').innerText = clubName;
 
-        // 💡 [핵심 버그 수정] 클럽별로 브라우저 메모리 이름 완벽 분리!
         const LS_PLAYERS_KEY = clubId + '_players';
         const LS_SETTINGS_KEY = clubId + '_settings';
 
@@ -129,16 +129,23 @@
             document.getElementById('match_duration').value = 15;
         }
 
-        // 💡 [핵심 버그 수정] 파이어베이스 '실시간(onSnapshot)' 강제 동기화
-        // 이제 폰에서 켜든 PC에서 켜든 무조건 서버 최신 데이터를 긁어와서 보여줍니다.
-        db.collection("clubs").doc(clubId).onSnapshot(doc => {
-            if (doc.exists && doc.data().roster) {
-                players = doc.data().roster;
-                localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); // 내 클럽 전용 메모리에 덮어쓰기
-                renderTable();
+        // 💡 해결 핵심 2: 로그인 상태가 완벽히 로딩된 후 서버와 통신 시작
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // 출입증 확인 완료! 파이어베이스 '실시간(onSnapshot)' 강제 동기화 시작
+                db.collection("clubs").doc(clubId).onSnapshot(doc => {
+                    if (doc.exists && doc.data().roster) {
+                        players = doc.data().roster;
+                        localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); 
+                        renderTable();
+                    } else {
+                        const savedPlayers = localStorage.getItem(LS_PLAYERS_KEY);
+                        if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); }
+                    }
+                });
             } else {
-                const savedPlayers = localStorage.getItem(LS_PLAYERS_KEY);
-                if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); }
+                alert("보안 세션이 만료되었습니다. 다시 로그인해주세요.");
+                window.location.href = "index.html";
             }
         });
 
@@ -211,7 +218,7 @@
         function generateMatches() {
             if (players.length < 16) return alert(`최소 16명 필요!`);
             const settings = { start_time: document.getElementById('start_time').value, end_time: document.getElementById('end_time').value, match_duration: parseInt(document.getElementById('match_duration').value) || 13, use_event: document.getElementById('use_event').checked, ev_start_time: document.getElementById('ev_start_time').value, ev_end_time: document.getElementById('ev_end_time').value, use_md: document.getElementById('use_md').checked, use_wd: document.getElementById('use_wd').checked, use_mix: document.getElementById('use_mix').checked };
-            localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); // 내 클럽 설정 따로 저장
+            localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); 
             window.location.href = "match.html";
         }
     </script>

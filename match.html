@@ -163,11 +163,11 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth(); // 💡 해결 핵심: 인증 모듈 스위치 켜기!
         
         const clubId = localStorage.getItem('clubId');
         if (!clubId) { window.location.href = "index.html"; }
 
-        // 💡 대진표, 설정, 선수명단 모두 클럽 아이디별로 독립 분리!
         const LS_PLAYERS_KEY = clubId + '_players';
         const LS_SETTINGS_KEY = clubId + '_settings';
         const LS_SCHEDULE_KEY = clubId + '_current_schedule';
@@ -179,6 +179,15 @@
         let currentEditCourt = null;
 
         window.onload = function() {
+            // 출입증 확인 절차 추가
+            auth.onAuthStateChanged((user) => {
+                if (!user) {
+                    alert("보안 세션이 만료되었습니다. 다시 로그인해주세요.");
+                    window.location.href = "index.html";
+                    return;
+                }
+            });
+
             const pData = localStorage.getItem(LS_PLAYERS_KEY);
             const sData = localStorage.getItem(LS_SETTINGS_KEY);
             
