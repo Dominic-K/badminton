@@ -128,10 +128,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         const clubId = urlParams.get('club') || "naru"; 
         
+	const clubNames = { "naru": "나루민턴", "smash": "스매쉬클럽", "kok": "콕스매쉬" };
+        const clubName = clubNames[clubId] || clubId.toUpperCase();
+
         // 화면 제목도 해당 클럽으로 변경
         document.querySelector('h1').innerText = `🏸 ${clubId.toUpperCase()} 실시간 대진표`;
         
         const container = document.getElementById('main-container');
+
         let currentScheduleData = [];
         let activePlayerFilter = null; 
         let tempModalPlayer = null;    
