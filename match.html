@@ -151,7 +151,7 @@
         </table>
     </div>
 
-    <script>
+ <script>
         const firebaseConfig = {
             apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
             authDomain: "badminton-ed485.firebaseapp.com",
@@ -166,6 +166,11 @@
         const clubId = localStorage.getItem('clubId');
         if (!clubId) { window.location.href = "index.html"; }
 
+        // 💡 대진표, 설정, 선수명단 모두 클럽 아이디별로 독립 분리!
+        const LS_PLAYERS_KEY = clubId + '_players';
+        const LS_SETTINGS_KEY = clubId + '_settings';
+        const LS_SCHEDULE_KEY = clubId + '_current_schedule';
+
         let players = [];
         let settings = {};
         let schedule = [];
@@ -173,25 +178,25 @@
         let currentEditCourt = null;
 
         window.onload = function() {
-            const pData = localStorage.getItem('naruminton_players');
-            const sData = localStorage.getItem('naruminton_settings');
+            const pData = localStorage.getItem(LS_PLAYERS_KEY);
+            const sData = localStorage.getItem(LS_SETTINGS_KEY);
             
             if (!pData || !sData) {
-                alert("데이터가 없습니다. 관리자 화면으로 돌아갑니다.");
+                alert("선수 데이터가 없거나 서버 동기화가 지연되었습니다. 관리자 화면으로 돌아갑니다.");
                 window.location.href = "admin.html";
                 return;
             }
             players = JSON.parse(pData);
             settings = JSON.parse(sData);
 
-            const existingSchedule = localStorage.getItem('naruminton_current_schedule');
+            const existingSchedule = localStorage.getItem(LS_SCHEDULE_KEY);
             
             setTimeout(() => {
                 if (existingSchedule) {
                     schedule = JSON.parse(existingSchedule);
                 } else {
                     runAIAlgorithm();
-                    localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule));
+                    localStorage.setItem(LS_SCHEDULE_KEY, JSON.stringify(schedule));
                 }
                 renderSchedule();
                 document.getElementById('loading').style.display = 'none';
@@ -204,9 +209,6 @@
             }
         }
 
-        // ==========================================
-        // 점수 모달
-        // ==========================================
         function openScoreModal(rIndex, cIndex) {
             currentEditRound = rIndex; currentEditCourt = cIndex;
             const match = schedule[rIndex].matches[cIndex];
@@ -221,20 +223,17 @@
         function saveScore() {
             schedule[currentEditRound].matches[currentEditCourt].score_a = document.getElementById('score_a_input').value;
             schedule[currentEditRound].matches[currentEditCourt].score_b = document.getElementById('score_b_input').value;
-            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule));
+            localStorage.setItem(LS_SCHEDULE_KEY, JSON.stringify(schedule));
             closeScoreModal(); renderSchedule();
         }
 
         function clearScore() {
             schedule[currentEditRound].matches[currentEditCourt].score_a = "";
             schedule[currentEditRound].matches[currentEditCourt].score_b = "";
-            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule));
+            localStorage.setItem(LS_SCHEDULE_KEY, JSON.stringify(schedule));
             closeScoreModal(); renderSchedule();
         }
 
-        // ==========================================
-        // 클라우드 기능
-        // ==========================================
         async function saveToDB() {
             const title = prompt("서버에 저장할 대진표 이름을 입력하세요\n(예: 8월1주차_최종)");
             if (!title) return;
@@ -266,9 +265,9 @@
 
         function applyLoadedData(data) {
             players = data.players; settings = data.settings; schedule = data.schedule;
-            localStorage.setItem('naruminton_players', JSON.stringify(players));
-            localStorage.setItem('naruminton_settings', JSON.stringify(settings));
-            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule)); 
+            localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players));
+            localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings));
+            localStorage.setItem(LS_SCHEDULE_KEY, JSON.stringify(schedule)); 
             renderSchedule(); closeLoadModal(); alert(`✅ 불러오기 완료!`);
         }
 
@@ -283,7 +282,7 @@
         }
 
         // ==========================================
-        // 매칭 알고리즘 (동일)
+        // 매칭 알고리즘 
         // ==========================================
         function runAIAlgorithm() {
             const parseTime = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -352,10 +351,9 @@
         }
 
         // ==========================================
-        // 💡 렌더링 & 통계 대시보드 업데이트
+        // 렌더링 & 통계 대시보드 업데이트
         // ==========================================
         function renderSchedule() {
-            // 1. 통계 계산
             let bWins = 0, rWins = 0;
             let pStats = {};
             players.forEach(p => pStats[p.name] = { team: p.global_team, md:0, wd:0, xd:0, total:0 });
@@ -381,7 +379,6 @@
                         const match = round.matches[c];
                         
                         if (match) {
-                            // 스탯 계산 추가
                             let sa = match.score_a ? parseInt(match.score_a) : null;
                             let sb = match.score_b ? parseInt(match.score_b) : null;
                             if (sa !== null && sb !== null) { if(sa>sb) bWins++; else if(sb>sa) rWins++; }
@@ -389,7 +386,6 @@
                             match.team_a.forEach(p => { if(pStats[p.name]){ pStats[p.name].total++; if(match.category==='남복') pStats[p.name].md++; else if(match.category==='여복') pStats[p.name].wd++; else pStats[p.name].xd++; } });
                             match.team_b.forEach(p => { if(pStats[p.name]){ pStats[p.name].total++; if(match.category==='남복') pStats[p.name].md++; else if(match.category==='여복') pStats[p.name].wd++; else pStats[p.name].xd++; } });
 
-                            // 화면 표시 (배경색)
                             let cellClass = "match-cell";
                             let scoreText = "점수 입력 대기";
                             if (sa !== null && sb !== null) { scoreText = `🏅 ${sa} : ${sb}`; if (sa > sb) cellClass += " win-a"; else if (sb > sa) cellClass += " win-b"; } 
@@ -405,15 +401,12 @@
                 tbody.appendChild(tr);
             });
 
-            // 2. 대시보드 화면 업데이트
             document.getElementById('dash-total-score').innerHTML = `<span class="team-a">🔵 ${bWins}승</span> <span style="font-size:20px; color:#999;">VS</span> <span class="team-b">🔴 ${rWins}승</span>`;
-            
             document.getElementById('dash-team-a').innerHTML = players.filter(p=>p.global_team==='A').map(p=>p.name).join('<br>');
             document.getElementById('dash-team-b').innerHTML = players.filter(p=>p.global_team==='B').map(p=>p.name).join('<br>');
 
             const statBody = document.getElementById('dash-player-stats');
             statBody.innerHTML = '';
-            // 이름 가나다 순으로 정렬해서 출력
             Object.keys(pStats).sort().forEach(name => {
                 const s = pStats[name];
                 statBody.innerHTML += `<tr><td><b>${name}</b></td><td>${s.team === 'A' ? '🔵' : '🔴'}</td><td>${s.md}</td><td>${s.wd}</td><td>${s.xd}</td><td><b style="color:#0b5394;">${s.total}</b></td></tr>`;

@@ -85,7 +85,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         // 파이어베이스 세팅
         const firebaseConfig = {
             apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
@@ -98,21 +98,26 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // 클럽 인증
         const clubId = localStorage.getItem('clubId');
         const clubName = localStorage.getItem('clubName');
         if (!clubId) { window.location.href = "index.html"; }
         document.getElementById('dynamic-club-name').innerText = clubName;
 
+        // 💡 [핵심 버그 수정] 클럽별로 브라우저 메모리 이름 완벽 분리!
+        const LS_PLAYERS_KEY = clubId + '_players';
+        const LS_SETTINGS_KEY = clubId + '_settings';
+
         let players = [];
         let editingPlayerName = null;
 
-        // 💡 [새 기능] 마지막으로 사용한 대회 설정값 불러오기
-        const savedSettings = localStorage.getItem('naruminton_settings');
+        // 설정값 불러오기
+        const savedSettings = localStorage.getItem(LS_SETTINGS_KEY);
         if (savedSettings) {
             const s = JSON.parse(savedSettings);
             document.getElementById('start_time').value = s.start_time || "06:00";
             document.getElementById('end_time').value = s.end_time || "08:30";
-            document.getElementById('match_duration').value = s.match_duration || 15; // 기본 15분
+            document.getElementById('match_duration').value = s.match_duration || 15; 
             document.getElementById('use_event').checked = s.use_event !== false;
             document.getElementById('ev_start_time').value = s.ev_start_time || "07:00";
             document.getElementById('ev_end_time').value = s.ev_end_time || "07:15";
@@ -120,18 +125,26 @@
             document.getElementById('use_wd').checked = s.use_wd !== false;
             document.getElementById('use_mix').checked = s.use_mix !== false;
         } else {
-            document.getElementById('match_duration').value = 15; // 완전 최초 사용 시 15분 고정
+            document.getElementById('match_duration').value = 15;
         }
 
-        db.collection("clubs").doc(clubId).get().then(doc => {
+        // 💡 [핵심 버그 수정] 파이어베이스 '실시간(onSnapshot)' 강제 동기화
+        // 이제 폰에서 켜든 PC에서 켜든 무조건 서버 최신 데이터를 긁어와서 보여줍니다.
+        db.collection("clubs").doc(clubId).onSnapshot(doc => {
             if (doc.exists && doc.data().roster) {
                 players = doc.data().roster;
+                localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); // 내 클럽 전용 메모리에 덮어쓰기
                 renderTable();
             } else {
-                const savedPlayers = localStorage.getItem('naruminton_players');
+                const savedPlayers = localStorage.getItem(LS_PLAYERS_KEY);
                 if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); }
             }
         });
+
+        document.querySelector('.btn-add').addEventListener('click', addPlayer);
+        document.querySelector('.btn-edit').addEventListener('click', editPlayer);
+        document.querySelector('.btn-delete').addEventListener('click', deletePlayer);
+        document.querySelector('.btn-generate').addEventListener('click', generateMatches);
 
         function renderTable() {
             const tbody = document.getElementById('player-list');
@@ -181,8 +194,7 @@
 
         function saveAndRefresh() {
             renderTable();
-            localStorage.setItem('naruminton_players', JSON.stringify(players));
-            // 💡 서버(파이어베이스)에 명단 0.1초만에 자동 저장(동기화)
+            localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players));
             document.getElementById('sync-status').innerText = "(서버 동기화 중...)";
             document.getElementById('sync-status').style.color = "red";
             db.collection("clubs").doc(clubId).set({ roster: players }, { merge: true }).then(() => {
@@ -198,7 +210,7 @@
         function generateMatches() {
             if (players.length < 16) return alert(`최소 16명 필요!`);
             const settings = { start_time: document.getElementById('start_time').value, end_time: document.getElementById('end_time').value, match_duration: parseInt(document.getElementById('match_duration').value) || 13, use_event: document.getElementById('use_event').checked, ev_start_time: document.getElementById('ev_start_time').value, ev_end_time: document.getElementById('ev_end_time').value, use_md: document.getElementById('use_md').checked, use_wd: document.getElementById('use_wd').checked, use_mix: document.getElementById('use_mix').checked };
-            localStorage.setItem('naruminton_settings', JSON.stringify(settings));
+            localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); // 내 클럽 설정 따로 저장
             window.location.href = "match.html";
         }
     </script>
