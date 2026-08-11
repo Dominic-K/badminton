@@ -126,9 +126,10 @@
 
         // 💡 URL 주소에서 클럽 ID 빼오기 (기본값은 naru)
         const urlParams = new URLSearchParams(window.location.search);
-        const clubId = urlParams.get('club') || "naru"; 
+	let clubId = urlParams.get('club') || "naru";
+        clubId = clubId.toLowerCase(); // 해결 핵심!
         
-	const clubNames = { "naru": "나루민턴", "smash": "스매쉬클럽", "kok": "콕스매쉬" };
+        const clubNames = { "naru": "나루민턴", "smash": "스매쉬클럽", "kok": "콕스매쉬" };
         const clubName = clubNames[clubId] || clubId.toUpperCase();
 
         // 화면 제목도 해당 클럽으로 변경

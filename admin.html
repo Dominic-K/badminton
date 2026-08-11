@@ -98,7 +98,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 💡 클럽 인증 및 닉네임 가져오기
         const clubId = localStorage.getItem('clubId');
         const clubName = localStorage.getItem('clubName');
         if (!clubId) { window.location.href = "index.html"; }
@@ -107,7 +106,23 @@
         let players = [];
         let editingPlayerName = null;
 
-        // 💡 화면 켜지면 파이어베이스 서버에서 명단 불러오기 (없으면 로컬스토리지)
+        // 💡 [새 기능] 마지막으로 사용한 대회 설정값 불러오기
+        const savedSettings = localStorage.getItem('naruminton_settings');
+        if (savedSettings) {
+            const s = JSON.parse(savedSettings);
+            document.getElementById('start_time').value = s.start_time || "06:00";
+            document.getElementById('end_time').value = s.end_time || "08:30";
+            document.getElementById('match_duration').value = s.match_duration || 15; // 기본 15분
+            document.getElementById('use_event').checked = s.use_event !== false;
+            document.getElementById('ev_start_time').value = s.ev_start_time || "07:00";
+            document.getElementById('ev_end_time').value = s.ev_end_time || "07:15";
+            document.getElementById('use_md').checked = s.use_md !== false;
+            document.getElementById('use_wd').checked = s.use_wd !== false;
+            document.getElementById('use_mix').checked = s.use_mix !== false;
+        } else {
+            document.getElementById('match_duration').value = 15; // 완전 최초 사용 시 15분 고정
+        }
+
         db.collection("clubs").doc(clubId).get().then(doc => {
             if (doc.exists && doc.data().roster) {
                 players = doc.data().roster;
@@ -117,11 +132,6 @@
                 if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); }
             }
         });
-
-        document.querySelector('.btn-add').addEventListener('click', addPlayer);
-        document.querySelector('.btn-edit').addEventListener('click', editPlayer);
-        document.querySelector('.btn-delete').addEventListener('click', deletePlayer);
-        document.querySelector('.btn-generate').addEventListener('click', generateMatches);
 
         function renderTable() {
             const tbody = document.getElementById('player-list');
