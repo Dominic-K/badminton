@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배드민턴 클라우드 - 로그인</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-box { background: white; padding: 40px 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        h1 { color: #0b5394; margin-bottom: 5px; font-size: 24px; }
+        p { color: #666; font-size: 14px; margin-bottom: 30px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .btn { width: 100%; padding: 12px; background-color: #0b5394; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .btn:hover { background-color: #083c6b; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h1>🏸 배드민턴 클라우드</h1>
+        <p>클럽 총무 전용 시스템</p>
+        <input type="email" id="email" placeholder="발급받은 이메일 아이디">
+        <input type="password" id="password" placeholder="비밀번호">
+        <button class="btn" onclick="login()">로그인</button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
+            authDomain: "badminton-ed485.firebaseapp.com",
+            projectId: "badminton-ed485",
+            storageBucket: "badminton-ed485.firebasestorage.app",
+            messagingSenderId: "1021547725240",
+            appId: "1:1021547725240:web:099bf98b77db2965d84f4d"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // 로그인 성공 시: 이메일 앞부분(naru, smash 등)을 클럽 ID로 저장
+                    const clubId = email.split('@')[0];
+                    localStorage.setItem('clubId', clubId); // 브라우저에 클럽 ID 기억시킴
+                    
+                    alert(`${clubId} 클럽 관리자로 로그인 되었습니다!`);
+                    window.location.href = "admin.html"; // 관리자 페이지로 이동!
+                })
+                .catch((error) => {
+                    alert("로그인 실패: 아이디나 비밀번호를 확인해주세요.");
+                });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배드민턴 클라우드 관리자 시스템</title>
+    <style>
+        /* 기본 디자인 (CSS) */
+        body { font-family: 'Arial', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .header { text-align: center; background-color: #0b5394; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .container { display: flex; gap: 20px; }
+        
+        /* 왼쪽 패널: 선수 목록 */
+        .left-panel { flex: 2; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #eeeeee; cursor: pointer; }
+        th:hover { background-color: #ddd; }
+
+        /* 오른쪽 패널: 선수 등록 및 설정 */
+        .right-panel { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .form-row { display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center; }
+        .form-row label { font-weight: bold; font-size: 14px; width: 40%; cursor: help; }
+        .form-row input, .form-row select { width: 55%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        /* 버튼 디자인 */
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 8px; transition: 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-add { background-color: #93c47d; color: white; margin-top: 10px; }
+        .btn-edit { background-color: #ffd966; color: #333; }
+        .btn-delete { background-color: #e06666; color: white; }
+        .btn-generate { background-color: #3d85c6; color: white; font-size: 16px; padding: 15px; height: 100%; }
+
+        /* 하단 대회 설정 패널 */
+        .bottom-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-top: 20px; display: flex; gap: 20px; }
+        .settings-box { flex: 3; display: flex; flex-direction: column; gap: 15px; }
+        .settings-row { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .settings-row label { font-weight: bold; cursor: help; }
+        .settings-row input[type="time"], .settings-row input[type="number"] { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .generate-box { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 id="club-title">🏆 <span id="dynamic-club-name">나루민턴</span> 클라우드 관리자 시스템 🏆</h2>
+        <p>클럽 총무 전용 대시보드</p>
+    </div>
+
+    <div class="container">
+        <!-- 왼쪽: 선수 목록 -->
+        <div class="left-panel">
+            <h3 title="현재 등록된 출전 선수들의 명단입니다. 표의 제목을 누르면 정렬됩니다.">👥 출전 선수 명단</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th title="선수 이름 정렬">이름</th>
+                        <th title="성별 정렬">성별</th>
+                        <th title="실력 점수 정렬">수준</th>
+                        <th title="늦게 오는 시간 정렬">늦참</th>
+                        <th title="일찍 가는 시간 정렬">조퇴</th>
+                        <th title="최소 보장 경기수 정렬">최소보장</th>
+                        <th title="무조건 같은 팀이 되는 파트너">지정파트너</th>
+                        <th title="절대 같은 팀이 되지 않는 파트너">기피파트너</th>
+                    </tr>
+                </thead>
+                <tbody id="player-list">
+                    <tr>
+                        <td colspan="8">등록된 선수가 없습니다.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 오른쪽: 선수 등록 폼 -->
+        <div class="right-panel">
+            <h3>⚙️ 선수 등록 / 수정</h3>
+            
+            <div class="form-row">
+                <label>이름</label>
+                <input type="text" id="name" placeholder="이름 입력">
+            </div>
+            <div class="form-row">
+                <label>성별</label>
+                <select id="gender"><option>남</option><option>여</option></select>
+            </div>
+            <div class="form-row" title="숫자가 높을수록 실력이 뛰어난 선수입니다. (최대 30)">
+                <label>수준 (1~30)</label>
+                <input type="number" id="skill" value="15" min="1" max="30">
+            </div>
+            <div class="form-row" title="대회 시작 후 지각하는 시간(분)입니다.">
+                <label>늦참 (분)</label>
+                <select id="late_min">
+                    <option value="0">정상 출석</option><option value="15">15분</option>
+                    <option value="30">30분</option><option value="45">45분</option><option value="60">60분</option>
+                </select>
+            </div>
+            <div class="form-row" title="대회 종료 전 미리 집에 가는 시간(분)입니다.">
+                <label>조퇴 (분)</label>
+                <select id="early_min">
+                    <option value="0">풀타임</option><option value="15">15분</option>
+                    <option value="30">30분</option><option value="45">45분</option><option value="60">60분</option>
+                </select>
+            </div>
+            <div class="form-row" title="AI가 이 선수를 우선적으로 배정하여 최소한 이 경기 수만큼은 뛰게 보장합니다.">
+                <label>최소 보장(경기)</label>
+                <input type="number" id="min_games" value="0" min="0" max="10">
+            </div>
+            <div class="form-row" title="반드시 같은 글로벌 팀으로 묶여 파트너가 될 선수의 이름을 적으세요.">
+                <label>지정 파트너</label>
+                <input type="text" id="pref_partner" placeholder="이름 입력">
+            </div>
+            <div class="form-row" title="절대로 같은 글로벌 팀으로 묶이지 않을(서로 적으로만 만날) 선수의 이름을 적으세요.">
+                <label>기피 파트너</label>
+                <input type="text" id="avoid_partner" placeholder="이름 입력">
+            </div>
+
+            <button class="btn btn-add" title="위 정보로 새로운 선수를 명단에 추가합니다.">➕ 선수 신규 등록</button>
+            <button class="btn btn-edit" title="좌측 표에서 클릭한 선수의 정보를 현재 적힌 값으로 바꿉니다.">✏️ 선택 선수 정보 수정</button>
+            <button class="btn btn-delete" title="좌측 표에서 클릭한 선수를 명단에서 아예 지웁니다.">❌ 선택 삭제</button>
+        </div>
+    </div>
+
+    <!-- 하단: 매칭 환경 설정 -->
+    <div class="bottom-panel">
+        <div class="settings-box">
+            <div class="settings-row">
+                <label title="대회가 시작되는 시간입니다.">⏱️ 대회 시간 :</label> 
+                <input type="time" id="start_time" value="06:00"> ~ 
+                <input type="time" id="end_time" value="08:30"> 
+                &nbsp;|&nbsp;
+                <label title="한 경기당 코트를 차지하는 시간입니다.">1경기 진행:</label> 
+                <input type="number" id="match_duration" value="13" style="width: 50px;" title="원하는 분 단위로 자유롭게 조절하세요"> 분
+            </div>
+            <div class="settings-row">
+                <label title="이 시간에는 경기를 배정하지 않고 코트를 비웁니다.">🎉 이벤트 타임 :</label>
+                <input type="checkbox" id="use_event" checked title="이벤트 타임을 사용하려면 체크하세요."> 사용함
+                &nbsp;
+                <input type="time" id="ev_start_time" value="07:00"> ~ 
+                <input type="time" id="ev_end_time" value="07:15">
+            </div>
+            <div class="settings-row">
+                <label title="대회에서 진행할 경기 종목을 선택하세요.">🏸 경기 종목 :</label>
+                <label><input type="checkbox" id="use_md" checked> 남복</label>
+                <label><input type="checkbox" id="use_wd" checked> 여복</label>
+                <label><input type="checkbox" id="use_mix" checked> 혼복</label>
+            </div>
+        </div>
+        <div class="generate-box">
+            <button class="btn btn-generate" title="모든 설정을 반영하여 완벽한 대진표를 계산하고 다음 화면으로 넘어갑니다.">▶ 대진표 자동 생성</button>
+        </div>
+    </div>
+
+    <script>
+        // 💡 1. 로그인 검사 및 클럽 ID 동적 할당
+        const clubId = localStorage.getItem('clubId');
+        if (!clubId) {
+            alert("로그인이 필요합니다!");
+            window.location.href = "index.html"; // 로그인 안했으면 로그인 창으로 쫓아냄
+        }
+        
+        // 화면 제목도 로그인한 클럽 이름으로 자동 변경
+        const nameElement = document.getElementById('dynamic-club-name');
+        if (nameElement) nameElement.innerText = clubId.toUpperCase();
+
+        // ----------------------------------------------------
+
+        let players = [];
+        let editingPlayerName = null;
+
+        // 화면 켜지자마자 실행
+        const savedPlayers = localStorage.getItem('naruminton_players');
+        if (savedPlayers) {
+            players = JSON.parse(savedPlayers);
+        }
+        renderTable();
+
+        // 버튼 클릭 연결
+        document.querySelector('.btn-add').addEventListener('click', addPlayer);
+        document.querySelector('.btn-edit').addEventListener('click', editPlayer);
+        document.querySelector('.btn-delete').addEventListener('click', deletePlayer);
+        document.querySelector('.btn-generate').addEventListener('click', generateMatches);
+
+        // 표 그리기
+        function renderTable() {
+            const tbody = document.getElementById('player-list');
+            tbody.innerHTML = '';
+
+            if (players.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8">등록된 선수가 없습니다.</td></tr>';
+                return;
+            }
+
+            players.sort((a, b) => a.name.localeCompare(b.name));
+
+            players.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                tr.onclick = () => loadPlayerToForm(p);
+
+                tr.innerHTML = `
+                    <td><b>${p.name}</b></td>
+                    <td>${p.gender}</td>
+                    <td>${p.skill}</td>
+                    <td>${p.late_min > 0 ? p.late_min + '분' : '-'}</td>
+                    <td>${p.early_min > 0 ? p.early_min + '분' : '-'}</td>
+                    <td>${p.min_games > 0 ? p.min_games + '경기' : '-'}</td>
+                    <td style="color:blue;">${p.pref_partner || '-'}</td>
+                    <td style="color:red;">${p.avoid_partner || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 폼에 불러오기
+        function loadPlayerToForm(p) {
+            document.getElementById('name').value = p.name;
+            document.getElementById('gender').value = p.gender;
+            document.getElementById('skill').value = p.skill;
+            document.getElementById('late_min').value = p.late_min;
+            document.getElementById('early_min').value = p.early_min;
+            document.getElementById('min_games').value = p.min_games;
+            document.getElementById('pref_partner').value = p.pref_partner || '';
+            document.getElementById('avoid_partner').value = p.avoid_partner || '';
+            editingPlayerName = p.name;
+        }
+
+        // 추가
+        function addPlayer() {
+            const name = document.getElementById('name').value.trim();
+            if (!name) return alert("이름을 입력해주세요!");
+            if (players.some(p => p.name === name)) return alert("이미 등록된 이름입니다.");
+
+            const newPlayer = {
+                name: name,
+                gender: document.getElementById('gender').value,
+                skill: parseInt(document.getElementById('skill').value) || 15,
+                late_min: parseInt(document.getElementById('late_min').value) || 0,
+                early_min: parseInt(document.getElementById('early_min').value) || 0,
+                min_games: parseInt(document.getElementById('min_games').value) || 0,
+                pref_partner: document.getElementById('pref_partner').value.trim(),
+                avoid_partner: document.getElementById('avoid_partner').value.trim()
+            };
+
+            players.push(newPlayer);
+            saveAndRefresh();
+            clearForm();
+        }
+
+        // 수정
+        function editPlayer() {
+            if (!editingPlayerName) return alert("좌측 표에서 수정할 선수를 먼저 클릭해주세요.");
+            
+            const newName = document.getElementById('name').value.trim();
+            if (!newName) return alert("이름을 비울 수 없습니다.");
+            if (newName !== editingPlayerName && players.some(p => p.name === newName)) {
+                return alert("이미 존재하는 이름으로 수정할 수 없습니다.");
+            }
+
+            const index = players.findIndex(p => p.name === editingPlayerName);
+            if (index !== -1) {
+                players[index].name = newName;
+                players[index].gender = document.getElementById('gender').value;
+                players[index].skill = parseInt(document.getElementById('skill').value) || 15;
+                players[index].late_min = parseInt(document.getElementById('late_min').value) || 0;
+                players[index].early_min = parseInt(document.getElementById('early_min').value) || 0;
+                players[index].min_games = parseInt(document.getElementById('min_games').value) || 0;
+                players[index].pref_partner = document.getElementById('pref_partner').value.trim();
+                players[index].avoid_partner = document.getElementById('avoid_partner').value.trim();
+            }
+
+            alert(`[${newName}] 선수의 정보가 수정되었습니다.`);
+            saveAndRefresh();
+            clearForm();
+        }
+
+        // 삭제
+        function deletePlayer() {
+            if (!editingPlayerName) return alert("좌측 표에서 삭제할 선수를 먼저 클릭해주세요.");
+            
+            if (confirm(`정말로 [${editingPlayerName}] 선수를 명단에서 삭제하시겠습니까?`)) {
+                players = players.filter(p => p.name !== editingPlayerName);
+                saveAndRefresh();
+                clearForm();
+            }
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('naruminton_players', JSON.stringify(players));
+            renderTable();
+        }
+
+        function clearForm() {
+            document.getElementById('name').value = '';
+            document.getElementById('pref_partner').value = '';
+            document.getElementById('avoid_partner').value = '';
+            editingPlayerName = null;
+        }
+
+        function generateMatches() {
+            if (players.length < 16) {
+                return alert(`최소 16명의 선수가 필요합니다! (현재 ${players.length}명)`);
+            }
+
+            const settings = {
+                start_time: document.getElementById('start_time').value,
+                end_time: document.getElementById('end_time').value,
+                match_duration: parseInt(document.getElementById('match_duration').value) || 13,
+                use_event: document.getElementById('use_event').checked,
+                ev_start_time: document.getElementById('ev_start_time').value,
+                ev_end_time: document.getElementById('ev_end_time').value,
+                use_md: document.getElementById('use_md').checked,
+                use_wd: document.getElementById('use_wd').checked,
+                use_mix: document.getElementById('use_mix').checked
+            };
+
+            if (!settings.use_md && !settings.use_wd && !settings.use_mix) {
+                return alert("남복, 여복, 혼복 중 최소 1개는 체크되어야 합니다.");
+            }
+
+            localStorage.setItem('naruminton_settings', JSON.stringify(settings));
+            alert("설정이 완료되었습니다. 매칭 화면으로 이동합니다!");
+            window.location.href = "match.html";
+        }
+    </script>
+</body>
+</html>

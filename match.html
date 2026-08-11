@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배드민턴 클라우드 - 대진표 생성 결과</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background-color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .title { font-size: 20px; font-weight: bold; color: #0b5394; margin: 0; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-back { background-color: #e06666; color: white; }
+        .btn-save { background-color: #3d85c6; color: white; }
+        .btn-load { background-color: #fce5cd; color: #b45f06; }
+        .btn-web { background-color: #f1c232; color: #333; }
+
+        /* 대진표 표 스타일 */
+        .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+        th, td { border: 1px solid #ddd; padding: 15px; text-align: center; vertical-align: middle; }
+        th { background-color: #eeeeee; font-size: 16px; }
+        
+        /* 💡 매치 칸 스타일 (클릭 가능하게 변경) */
+        .match-cell { background-color: #ffffff; border-radius: 6px; padding: 10px; border: 2px solid #ddd; font-size: 14px; line-height: 1.5; cursor: pointer; transition: 0.2s; position: relative; }
+        .match-cell:hover { border-color: #0b5394; box-shadow: 0 0 8px rgba(11, 83, 148, 0.3); transform: scale(1.02); }
+        
+        /* 승패에 따른 배경색 */
+        .win-a { background-color: #d9edf7; border-color: #9acfea; }
+        .win-b { background-color: #f2dede; border-color: #ebccd1; }
+        
+        .team-a { color: #0b5394; font-weight: bold; }
+        .team-b { color: #cc0000; font-weight: bold; }
+        .category { font-size: 12px; color: #666; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 5px; }
+        
+        /* 스코어 표시 배지 */
+        .score-badge { display: block; margin-top: 8px; font-size: 16px; font-weight: bold; color: #333; background: #fff2cc; padding: 4px; border-radius: 4px; }
+
+        .event-cell { background-color: #fff2cc; font-weight: bold; font-size: 16px; color: #b45f06; padding: 20px; }
+        .time-cell { background-color: #f9f9f9; font-weight: bold; font-size: 14px; }
+
+        /* 로딩 화면 */
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
+        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #3d85c6; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 💡 모달 창 (불러오기 & 스코어 입력 공용) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 350px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .schedule-item { padding: 15px; border-bottom: 1px solid #ddd; cursor: pointer; transition: 0.2s; font-weight: bold; text-align: left; }
+        .schedule-item:hover { background-color: #f4f7f6; }
+        
+        /* 스코어 입력 폼 스타일 */
+        .score-inputs { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 20px 0; font-size: 24px; font-weight: bold; }
+        .score-inputs input { width: 60px; height: 50px; font-size: 24px; text-align: center; font-weight: bold; border: 2px solid #ccc; border-radius: 8px; }
+        .score-inputs input:focus { outline: none; border-color: #0b5394; }
+        .team-label { font-size: 15px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <h2 style="color: #0b5394;">🤖 데이터 동기화 중...</h2>
+    </div>
+
+    <!-- 불러오기 모달 -->
+    <div id="loadModal" class="modal-overlay">
+        <div class="modal-content" style="max-height: 80%; overflow-y: auto;">
+            <h3 style="margin-top: 0; color: #0b5394;">📂 클라우드에서 불러오기</h3>
+            <ul id="scheduleList" style="list-style: none; padding: 0; margin: 0 0 20px 0;"></ul>
+            <button class="btn btn-back" style="width: 100%;" onclick="closeLoadModal()">닫기</button>
+        </div>
+    </div>
+
+    <!-- 💡 점수 입력 모달 -->
+    <div id="scoreModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: #333;">🏅 경기 결과 입력</h3>
+            <div id="score-team-info" style="font-size: 14px; color: #666; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                <!-- 팀 이름이 여기에 들어갑니다 -->
+            </div>
+            
+            <div class="score-inputs">
+                <div>
+                    <div class="team-label team-a">🔵 A팀</div>
+                    <input type="number" id="score_a_input" placeholder="0" min="0">
+                </div>
+                <div>:</div>
+                <div>
+                    <div class="team-label team-b">🔴 B팀</div>
+                    <input type="number" id="score_b_input" placeholder="0" min="0">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-save" style="flex: 1;" onclick="saveScore()">✔️ 점수 저장</button>
+                <button class="btn btn-back" style="flex: 1;" onclick="closeScoreModal()">취소</button>
+            </div>
+            <button class="btn" style="width: 100%; margin-top: 10px; background-color:#eee; color:#666;" onclick="clearScore()">초기화 (점수 지우기)</button>
+        </div>
+    </div>
+
+    <div class="top-bar">
+        <button class="btn btn-back" onclick="goBack()">◀ 설정으로 돌아가기</button>
+        <h1 class="title">🏆 대회 매칭 결과 및 스코어 보드</h1>
+        <div>
+            <button class="btn btn-save" onclick="saveToDB()" title="현재 대진표와 입력된 점수를 서버에 저장합니다.">💾 클라우드 저장</button>
+            <button class="btn btn-load" onclick="openLoadModal()">📂 불러오기</button>
+            <button class="btn btn-web" onclick="publishToWeb()" title="입력된 점수를 참가자 스마트폰으로 실시간 쏩니다!">🌐 참가자에게 전송</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">경기 시간 (회차)</th>
+                    <th style="width: 21%;">🏸 1번 코트 (클릭시 점수입력)</th>
+                    <th style="width: 21%;">🏸 2번 코트 (클릭시 점수입력)</th>
+                    <th style="width: 21%;">🏸 3번 코트 (클릭시 점수입력)</th>
+                    <th style="width: 21%;">🏸 4번 코트 (클릭시 점수입력)</th>
+                </tr>
+            </thead>
+            <tbody id="match-tbody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // 파이어베이스 연결 세팅
+        const firebaseConfig = {
+            apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
+            authDomain: "badminton-ed485.firebaseapp.com",
+            projectId: "badminton-ed485",
+            storageBucket: "badminton-ed485.firebasestorage.app",
+            messagingSenderId: "1021547725240",
+            appId: "1:1021547725240:web:099bf98b77db2965d84f4d",
+            measurementId: "G-J4D0CQ34B3"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+       // 💡 로그인 검사 및 클럽 ID 동적 할당
+        const clubId = localStorage.getItem('clubId');
+        if (!clubId) {
+            alert("로그인이 필요합니다!");
+            window.location.href = "index.html"; // 로그인 안했으면 쫓아냄
+        }
+        // 화면 제목도 클럽 이름으로 자동 변경 (admin.html의 경우)
+        const nameElement = document.getElementById('dynamic-club-name');
+        if (nameElement) nameElement.innerText = clubId.toUpperCase();
+
+        let players = [];
+        let settings = {};
+        let schedule = [];
+        
+        // 💡 현재 점수를 입력 중인 경기의 위치를 기억하는 변수
+        let currentEditRound = null;
+        let currentEditCourt = null;
+
+        window.onload = function() {
+            const pData = localStorage.getItem('naruminton_players');
+            const sData = localStorage.getItem('naruminton_settings');
+            
+            if (!pData || !sData) {
+                alert("데이터가 없습니다. 관리자 화면으로 돌아갑니다.");
+                window.location.href = "admin.html";
+                return;
+            }
+            players = JSON.parse(pData);
+            settings = JSON.parse(sData);
+
+            // 기존에 진행 중이던 대진표가 로컬에 남아있다면 가져오고, 없으면 새로 짠다.
+            const existingSchedule = localStorage.getItem('naruminton_current_schedule');
+            
+            setTimeout(() => {
+                if (existingSchedule) {
+                    schedule = JSON.parse(existingSchedule);
+                } else {
+                    runAIAlgorithm();
+                    localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule)); // 짠 직후 자동 임시 저장
+                }
+                renderSchedule();
+                document.getElementById('loading').style.display = 'none';
+            }, 500);
+        };
+
+        function goBack() {
+            if(confirm("설정 화면으로 돌아가시겠습니까?\n주의: 새로 '자동 생성'을 누르면 지금 대진표와 스코어는 모두 초기화됩니다.")) {
+                // 뒤로갈 때 진행중이던 대진표는 날려버림 (새로 짤 수 있게)
+                localStorage.removeItem('naruminton_current_schedule');
+                window.location.href = "admin.html";
+            }
+        }
+
+        // ==========================================
+        // 💡 점수 입력 기능 (스코어 모달)
+        // ==========================================
+        function openScoreModal(rIndex, cIndex) {
+            currentEditRound = rIndex;
+            currentEditCourt = cIndex;
+            
+            const match = schedule[rIndex].matches[cIndex];
+            const teamA_names = match.team_a.map(p => p.name).join(" & ");
+            const teamB_names = match.team_b.map(p => p.name).join(" & ");
+            
+            document.getElementById('score-team-info').innerHTML = `
+                <span style="color:#0b5394; font-weight:bold;">${teamA_names}</span><br>
+                VS<br>
+                <span style="color:#cc0000; font-weight:bold;">${teamB_names}</span>
+            `;
+            
+            // 기존 점수가 있으면 띄워주기
+            document.getElementById('score_a_input').value = match.score_a || "";
+            document.getElementById('score_b_input').value = match.score_b || "";
+            
+            document.getElementById('scoreModal').style.display = 'flex';
+        }
+
+        function closeScoreModal() {
+            document.getElementById('scoreModal').style.display = 'none';
+        }
+
+        function saveScore() {
+            const scoreA = document.getElementById('score_a_input').value;
+            const scoreB = document.getElementById('score_b_input').value;
+            
+            if (scoreA !== "" || scoreB !== "") {
+                schedule[currentEditRound].matches[currentEditCourt].score_a = scoreA;
+                schedule[currentEditRound].matches[currentEditCourt].score_b = scoreB;
+            }
+            
+            // 로컬에 임시 자동 저장 (새로고침해도 점수 안 날아가게)
+            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule));
+            
+            closeScoreModal();
+            renderSchedule();
+        }
+
+        function clearScore() {
+            schedule[currentEditRound].matches[currentEditCourt].score_a = "";
+            schedule[currentEditRound].matches[currentEditCourt].score_b = "";
+            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule));
+            
+            closeScoreModal();
+            renderSchedule();
+        }
+
+
+        // ==========================================
+        // 저장 / 불러오기 / 전송 로직
+        // ==========================================
+        async function saveToDB() {
+            const title = prompt("서버에 저장할 대진표 이름을 입력하세요\n(예: 8월1주차_최종)");
+            if (!title) return;
+
+            document.getElementById('loading').style.display = 'flex';
+            const dataToSave = {
+                title: title,
+                players: players,
+                settings: settings,
+                schedule: schedule, // 💡 점수가 적힌 스케줄이 그대로 저장됨!
+                savedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection("clubs").doc(clubId).collection("schedules").doc(title).set(dataToSave);
+                alert(`🎉 [${title}] 저장 완료!`);
+            } catch (error) {
+                alert("저장 실패: " + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        async function openLoadModal() {
+            const listUl = document.getElementById('scheduleList');
+            listUl.innerHTML = "<li class='schedule-item'>서버에서 목록을 불러오는 중...⏳</li>";
+            document.getElementById('loadModal').style.display = 'flex';
+
+            try {
+                const snapshot = await db.collection("clubs").doc(clubId).collection("schedules").orderBy("savedAt", "desc").get();
+                listUl.innerHTML = "";
+                if (snapshot.empty) {
+                    listUl.innerHTML = "<li class='schedule-item'>저장된 대진표가 없습니다.</li>";
+                    return;
+                }
+                snapshot.forEach(doc => {
+                    const li = document.createElement('li');
+                    li.className = 'schedule-item';
+                    li.innerText = `📄 ${doc.id}`;
+                    li.onclick = () => applyLoadedData(doc.data());
+                    listUl.appendChild(li);
+                });
+            } catch (error) {
+                listUl.innerHTML = `<li class='schedule-item' style='color:red;'>에러: ${error.message}</li>`;
+            }
+        }
+
+        function closeLoadModal() { document.getElementById('loadModal').style.display = 'none'; }
+
+        function applyLoadedData(data) {
+            players = data.players;
+            settings = data.settings;
+            schedule = data.schedule;
+
+            localStorage.setItem('naruminton_players', JSON.stringify(players));
+            localStorage.setItem('naruminton_settings', JSON.stringify(settings));
+            localStorage.setItem('naruminton_current_schedule', JSON.stringify(schedule)); // 덮어쓰기
+
+            renderSchedule();
+            closeLoadModal();
+            alert(`✅ [${data.title}] 불러오기 완료!`);
+        }
+
+        async function publishToWeb() {
+            if (!confirm("현재 스코어와 대진표를 참가자 스마트폰으로 전송하시겠습니까?")) return;
+
+            document.getElementById('loading').style.display = 'flex';
+            const liveData = {
+                schedule: schedule,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            try {
+                await db.collection("clubs").doc(clubId).set({ live_schedule: liveData }, { merge: true });
+                alert("🌐 서버 전송 완료!\n\n회원들의 스마트폰에 스코어와 MVP가 즉시 반영됩니다.");
+            } catch (error) {
+                alert("전송 실패: " + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        // 매칭 알고리즘
+        // ==========================================
+        function runAIAlgorithm() {
+            const parseTime = (timeStr) => {
+                const [h, m] = timeStr.split(':').map(Number);
+                return h * 60 + m;
+            };
+
+            let startMin = parseTime(settings.start_time);
+            let endMin = parseTime(settings.end_time);
+            let evStartMin = parseTime(settings.ev_start_time);
+            let evEndMin = parseTime(settings.ev_end_time);
+            let duration = settings.match_duration;
+
+            let totalRounds = Math.floor((endMin - startMin) / duration);
+
+            let men = players.filter(p => p.gender === '남').sort((a,b) => b.skill - a.skill);
+            let women = players.filter(p => p.gender === '여').sort((a,b) => b.skill - a.skill);
+            
+            const assignTeams = (group) => {
+                for(let i=0; i<group.length; i+=2) {
+                    if(i+1 < group.length) {
+                        let t = Math.random() > 0.5 ? ['A','B'] : ['B','A'];
+                        group[i].global_team = t[0];
+                        group[i+1].global_team = t[1];
+                    } else {
+                        group[i].global_team = Math.random() > 0.5 ? 'A' : 'B';
+                    }
+                }
+            };
+            assignTeams(men);
+            assignTeams(women);
+
+            players.forEach(p => { p.total_play = 0; });
+
+            let prevRoundPlayed = new Set();
+            schedule = [];
+
+            for (let r = 0; r < totalRounds; r++) {
+                let c_start = startMin + r * duration;
+                let c_end = c_start + duration;
+                
+                let sh = String(Math.floor(c_start / 60)).padStart(2, '0');
+                let sm = String(c_start % 60).padStart(2, '0');
+                let eh = String(Math.floor(c_end / 60)).padStart(2, '0');
+                let em = String(c_end % 60).padStart(2, '0');
+                let timeStr = `${sh}:${sm} ~ ${eh}:${em}`;
+
+                let roundData = { round: r + 1, time: timeStr, matches: [] };
+
+                if (settings.use_event && c_start >= evStartMin && c_end <= evEndMin) {
+                    roundData.is_event = true;
+                    schedule.push(roundData);
+                    prevRoundPlayed.clear();
+                    continue;
+                }
+
+                let availA = players.filter(p => p.global_team === 'A' && (startMin + p.late_min) <= c_start && (endMin - p.early_min) >= c_end);
+                let availB = players.filter(p => p.global_team === 'B' && (startMin + p.late_min) <= c_start && (endMin - p.early_min) >= c_end);
+
+                if (availA.length < 8 || availB.length < 8) {
+                    roundData.error = "인원 부족";
+                    schedule.push(roundData);
+                    prevRoundPlayed.clear();
+                    continue;
+                }
+
+                const sortPlay = (a, b) => {
+                    if (a.total_play !== b.total_play) return a.total_play - b.total_play;
+                    let aPrev = prevRoundPlayed.has(a.name) ? 1 : 0;
+                    let bPrev = prevRoundPlayed.has(b.name) ? 1 : 0;
+                    return aPrev - bPrev;
+                };
+
+                let A_m = availA.filter(p => p.gender === '남').sort(sortPlay);
+                let A_w = availA.filter(p => p.gender === '여').sort(sortPlay);
+                let B_m = availB.filter(p => p.gender === '남').sort(sortPlay);
+                let B_w = availB.filter(p => p.gender === '여').sort(sortPlay);
+
+                let courts = [];
+                let currentPlayed = new Set();
+                
+                let typePool = [];
+                if(settings.use_md) typePool.push('남복', '남복');
+                if(settings.use_mix) typePool.push('혼복', '혼복');
+                if(settings.use_wd) typePool.push('여복', '여복');
+                
+                for(let c=0; c<4; c++) {
+                    let type = typePool[c % typePool.length];
+                    // 💡 점수(score_a, score_b) 항목을 위해 빈칸으로 초기화
+                    let match = { court: c + 1, category: type, team_a: [], team_b: [], score_a: "", score_b: "" };
+                    
+                    if (type === '남복' && A_m.length >= 2 && B_m.length >= 2) {
+                        match.team_a = [A_m.shift(), A_m.shift()];
+                        match.team_b = [B_m.shift(), B_m.shift()];
+                    } else if (type === '여복' && A_w.length >= 2 && B_w.length >= 2) {
+                        match.team_a = [A_w.shift(), A_w.shift()];
+                        match.team_b = [B_w.shift(), B_w.shift()];
+                    } else if (type === '혼복' && A_m.length >= 1 && A_w.length >= 1 && B_m.length >= 1 && B_w.length >= 1) {
+                        match.team_a = [A_m.shift(), A_w.shift()];
+                        match.team_b = [B_m.shift(), B_w.shift()];
+                    } else {
+                        if (A_m.length >= 2 && B_m.length >= 2) {
+                            match.category = '남복';
+                            match.team_a = [A_m.shift(), A_m.shift()];
+                            match.team_b = [B_m.shift(), B_m.shift()];
+                        }
+                    }
+                    
+                    if (match.team_a.length === 2 && match.team_b.length === 2) {
+                        courts.push(match);
+                        match.team_a.forEach(p => { p.total_play++; currentPlayed.add(p.name); });
+                        match.team_b.forEach(p => { p.total_play++; currentPlayed.add(p.name); });
+                    }
+                }
+                
+                roundData.matches = courts;
+                schedule.push(roundData);
+                prevRoundPlayed = new Set(currentPlayed);
+            }
+        }
+
+        // ==========================================
+        // 🖥️ 렌더링 (점수 색상 반영)
+        // ==========================================
+        function renderSchedule() {
+            const tbody = document.getElementById('match-tbody');
+            tbody.innerHTML = '';
+
+            schedule.forEach((round, rIndex) => {
+                const tr = document.createElement('tr');
+
+                const tdTime = document.createElement('td');
+                tdTime.className = 'time-cell';
+                tdTime.innerHTML = `${round.time}<br>(${round.round}회차)`;
+                tr.appendChild(tdTime);
+
+                if (round.is_event) {
+                    const tdEvent = document.createElement('td');
+                    tdEvent.colSpan = 4;
+                    tdEvent.className = 'event-cell';
+                    tdEvent.innerText = "⭐ 특별 이벤트 타임 (공지 및 휴식) ⭐";
+                    tr.appendChild(tdEvent);
+                } 
+                else if (round.error) {
+                    const tdErr = document.createElement('td');
+                    tdErr.colSpan = 4;
+                    tdErr.style.backgroundColor = '#f8d7da';
+                    tdErr.style.color = '#721c24';
+                    tdErr.innerText = `⚠️ ${round.error} (참석 인원이 부족하여 경기를 짤 수 없습니다)`;
+                    tr.appendChild(tdErr);
+                }
+                else {
+                    for (let c = 0; c < 4; c++) {
+                        const td = document.createElement('td');
+                        const match = round.matches[c];
+                        
+                        if (match) {
+                            // 💡 점수에 따른 칸 색상(클래스) 결정 로직
+                            let cellClass = "match-cell";
+                            let sa = match.score_a !== undefined && match.score_a !== "" ? parseInt(match.score_a) : null;
+                            let sb = match.score_b !== undefined && match.score_b !== "" ? parseInt(match.score_b) : null;
+                            
+                            let scoreText = "점수 입력 대기";
+                            
+                            if (sa !== null && sb !== null) {
+                                scoreText = `🏅 ${sa} : ${sb}`;
+                                if (sa > sb) cellClass += " win-a";
+                                else if (sb > sa) cellClass += " win-b";
+                            } else if (sa !== null || sb !== null) {
+                                // 한쪽만 입력된 경우
+                                scoreText = `진행 중 ( ${sa !== null ? sa : "?"} : ${sb !== null ? sb : "?"} )`;
+                            }
+                            
+                            td.innerHTML = `
+                                <div class="${cellClass}" onclick="openScoreModal(${rIndex}, ${c})">
+                                    <span class="team-a">🔵 ${match.team_a[0].name} & ${match.team_a[1].name}</span><br>
+                                    <span style="color:#999; font-size:12px;">VS</span><br>
+                                    <span class="team-b">🔴 ${match.team_b[0].name} & ${match.team_b[1].name}</span><br>
+                                    <span class="category">${match.category}</span>
+                                    <span class="score-badge">${scoreText}</span>
+                                </div>
+                            `;
+                        } else {
+                            td.innerHTML = `<span style="color:#ccc;">빈 코트</span>`;
+                        }
+                        tr.appendChild(td);
+                    }
+                }
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
