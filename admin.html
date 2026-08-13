@@ -127,9 +127,25 @@
         
         function generateMatches() {
             if (players.length < 16) return alert(`최소 16명 필요!`);
-            const settings = { start_time: document.getElementById('start_time').value, end_time: document.getElementById('end_time').value, match_duration: parseInt(document.getElementById('match_duration').value) || 13, use_event: document.getElementById('use_event').checked, ev_start_time: document.getElementById('ev_start_time').value, ev_end_time: document.getElementById('ev_end_time').value, use_md: document.getElementById('use_md').checked, use_wd: document.getElementById('use_wd').checked, use_mix: document.getElementById('use_mix').checked };
+            
+            const settings = { 
+                start_time: document.getElementById('start_time').value, 
+                end_time: document.getElementById('end_time').value, 
+                match_duration: parseInt(document.getElementById('match_duration').value) || 13, 
+                use_event: document.getElementById('use_event').checked, 
+                ev_start_time: document.getElementById('ev_start_time').value, 
+                ev_end_time: document.getElementById('ev_end_time').value, 
+                use_md: document.getElementById('use_md').checked, 
+                use_wd: document.getElementById('use_wd').checked, 
+                use_mix: document.getElementById('use_mix').checked 
+            };
+            
             localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); 
             localStorage.setItem(LS_STATE_KEY, 'draft'); // 💡 대진표 새로 짤 때 무조건 '준비' 상태로 초기화
+            
+            // 💡 [핵심 해결 방법] 매칭 화면으로 넘어가기 전에 기존 대진표 메모리를 완전히 삭제!
+            localStorage.removeItem(clubId + '_current_schedule');
+            
             window.location.href = "match.html";
         }
     </script>
