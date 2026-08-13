@@ -4,77 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>나루민턴 실시간 대진표</title>
-    
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
     <style>
         body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; }
-        
-        /* 헤더 */
         header { background-color: #0b5394; color: white; text-align: center; padding: 15px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         h1 { margin: 0 0 5px 0; font-size: 20px; letter-spacing: 1px; }
         .status { font-size: 11px; color: #a4c2f4; }
         .status-dot { display: inline-block; width: 8px; height: 8px; background-color: #00ff00; border-radius: 50%; margin-right: 5px; animation: blink 1.5s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* 전체 대진표 복귀 버튼 */
         #reset-filter-btn { display: none; margin: 10px auto 0 auto; background-color: #ff9900; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
         .container { padding: 10px 15px; max-width: 600px; margin: 0 auto; padding-bottom: 50px; }
         
-        /* 🏆 스코어보드 & MVP 섹션 */
+        /* 💡 모바일 우승 배너 디자인 */
+        .winner-banner { background: linear-gradient(135deg, #f1c40f, #f39c12); color: white; text-align: center; padding: 25px 15px; font-size: 22px; font-weight: bold; border-radius: 12px; margin-bottom: 20px; display: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .winner-subtitle { font-size: 13px; font-weight: normal; margin-top: 5px; text-shadow: none; opacity: 0.9; }
+
         .dashboard { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
         .score-title { font-size: 14px; font-weight: bold; color: #666; margin-bottom: 10px; }
         .score-board { display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; gap: 15px; margin-bottom: 15px; border-bottom: 1px dashed #ddd; padding-bottom: 15px; }
-        .score-blue { color: #0b5394; }
-        .score-red { color: #cc0000; }
-        .score-vs { font-size: 16px; color: #999; }
-        
+        .score-blue { color: #0b5394; } .score-red { color: #cc0000; } .score-vs { font-size: 16px; color: #999; }
         .mvp-title { font-size: 13px; font-weight: bold; color: #333; margin-bottom: 8px; text-align: left; }
         .mvp-list { display: flex; flex-direction: column; gap: 5px; text-align: left; }
         .mvp-item { background: #f9f9f9; padding: 8px 10px; border-radius: 6px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; border-left: 4px solid gold; cursor: pointer; }
-        .mvp-item:nth-child(2) { border-left-color: silver; }
-        .mvp-item:nth-child(3) { border-left-color: #cd7f32; }
+        .mvp-item:nth-child(2) { border-left-color: silver; } .mvp-item:nth-child(3) { border-left-color: #cd7f32; }
         .mvp-stats { color: #666; font-size: 12px; }
 
-        /* 라운드 박스 & 매치 리스트 */
         .round-box { background: white; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); overflow: hidden; }
         .round-title { font-size: 15px; font-weight: bold; color: white; background-color: #555; padding: 10px 15px; text-align: center; }
-        
-        /* 💡 개별 경기 줄 디자인 */
         .match-row { display: flex; align-items: center; border-bottom: 1px solid #eee; padding: 12px 10px; transition: background-color 0.3s; }
         .match-row:last-child { border-bottom: none; }
-        
-        /* 💡 [새 기능] 승패에 따른 배경색 */
-        .match-row.win-a { background-color: #eaf4fb; } /* 청팀 승리시 연한 파랑 */
-        .match-row.win-b { background-color: #fbeaea; } /* 홍팀 승리시 연한 빨강 */
-        
-        /* 💡 내 경기 강조 (승패 색상과 겹쳐도 보이도록 왼쪽 굵은 선 추가) */
+        .match-row.win-a { background-color: #eaf4fb; } .match-row.win-b { background-color: #fbeaea; }
         .match-row.my-match { border-left: 5px solid #ff9900; }
         .match-row.my-match:not(.win-a):not(.win-b) { background-color: #fffde7; }
-        
         .court-badge { background: #e9ecef; color: #555; font-size: 11px; font-weight: bold; padding: 5px 8px; border-radius: 12px; white-space: nowrap; margin-right: 10px; min-width: 40px; text-align: center; }
         .teams-container { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        
         .team { font-size: 14px; font-weight: bold; letter-spacing: -0.5px; display: flex; justify-content: space-between; align-items: center; }
-        .team-a { color: #0b5394; }
-        .team-b { color: #cc0000; }
-        
+        .team-a { color: #0b5394; } .team-b { color: #cc0000; }
         .clickable-name { text-decoration: underline; text-decoration-color: #bbb; text-underline-offset: 3px; cursor: pointer; padding: 2px 0; }
-        
         .score-display { font-size: 13px; background: #eee; padding: 2px 6px; border-radius: 4px; color: #333; }
         .score-win { background: #ffd966; color: #b45f06; }
-        
         .vs-text { font-size: 11px; color: #aaa; text-align: center; font-weight: bold; margin: -2px 0; }
         .category-badge { font-size: 10px; background: #ddd; color: #666; padding: 2px 5px; border-radius: 4px; font-weight: normal; }
-        
         .event-box { background-color: #fff2cc; color: #b45f06; text-align: center; padding: 25px 10px; font-weight: bold; font-size: 15px; }
         .empty-text { color: #aaa; font-size: 13px; font-weight: normal; }
         #loading { text-align: center; padding: 50px 20px; color: #666; font-size: 15px; font-weight: bold; }
 
-        /* 모달 (프로필 창) 스타일 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; }
         .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .modal-content h2 { margin: 0 0 15px 0; color: #0b5394; font-size: 22px; }
@@ -87,8 +64,8 @@
 <body>
 
     <header>
-        <h1>🏸 나루민턴 실시간 대진표</h1>
-        <div class="status"><span class="status-dot"></span>서버와 실시간 연동 중</div>
+        <h1 id="header-title">🏸 실시간 대진표</h1>
+        <div class="status" id="header-status"><span class="status-dot"></span>서버와 실시간 연동 중</div>
         <button id="reset-filter-btn" onclick="resetFilter()">📋 전체 대진표로 돌아가기</button>
     </header>
 
@@ -96,7 +73,6 @@
         <div id="loading">📡 진행진이 대진표를 송출할 때까지 대기 중입니다...</div>
     </div>
 
-    <!-- 프로필 모달 팝업 -->
     <div id="player-modal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="modal-name">선수이름</h2>
@@ -113,254 +89,155 @@
     </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
-            authDomain: "badminton-ed485.firebaseapp.com",
-            projectId: "badminton-ed485",
-            storageBucket: "badminton-ed485.firebasestorage.app",
-            messagingSenderId: "1021547725240",
-            appId: "1:1021547725240:web:099bf98b77db2965d84f4d"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ", authDomain: "badminton-ed485.firebaseapp.com", projectId: "badminton-ed485", storageBucket: "badminton-ed485.firebasestorage.app", messagingSenderId: "1021547725240", appId: "1:1021547725240:web:099bf98b77db2965d84f4d" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 💡 URL 주소에서 클럽 ID 빼오기 (기본값은 naru)
         const urlParams = new URLSearchParams(window.location.search);
-	let clubId = urlParams.get('club') || "naru";
-        clubId = clubId.toLowerCase(); // 해결 핵심!
-        
+        let clubId = urlParams.get('club') || "naru";
+        clubId = clubId.toLowerCase(); 
         const clubNames = { "naru": "나루민턴", "smash": "스매쉬클럽", "kok": "콕스매쉬" };
-        const clubName = clubNames[clubId] || clubId.toUpperCase();
-
-        // 화면 제목도 해당 클럽으로 변경
-        document.querySelector('h1').innerText = `🏸 ${clubId.toUpperCase()} 실시간 대진표`;
+        document.getElementById('header-title').innerText = `🏸 ${clubNames[clubId] || clubId.toUpperCase()} 실시간 대진표`;
         
         const container = document.getElementById('main-container');
+        let currentScheduleData = []; let activePlayerFilter = null; let tempModalPlayer = null;    
+        let currentState = 'draft'; let currentWinner = null;
 
-        let currentScheduleData = [];
-        let activePlayerFilter = null; 
-        let tempModalPlayer = null;    
-
-        // 실시간 데이터 수신
+        // 💡 실시간 데이터 수신 (상태 감지 추가)
         db.collection("clubs").doc(clubId).onSnapshot((doc) => {
             if (doc.exists && doc.data().live_schedule) {
-                currentScheduleData = doc.data().live_schedule.schedule;
-                renderSchedule();
+                const liveData = doc.data().live_schedule;
+                currentScheduleData = liveData.schedule;
+                currentState = liveData.state || 'draft';
+                currentWinner = liveData.winner;
+                
+                if (currentState === 'draft') {
+                    container.innerHTML = `<div id="loading">📡 진행진이 대진표를 송출할 때까지 대기 중입니다...</div>`;
+                } else {
+                    if(currentState === 'finished') {
+                        document.getElementById('header-status').innerHTML = "🛑 대회가 종료되었습니다. 최종 기록입니다.";
+                        document.getElementById('header-status').style.color = "#ffcccc";
+                    } else {
+                        document.getElementById('header-status').innerHTML = `<span class="status-dot"></span>서버와 실시간 연동 중 (🔥대회 진행중)`;
+                        document.getElementById('header-status').style.color = "#a4c2f4";
+                    }
+                    renderSchedule();
+                }
             } else {
                 container.innerHTML = `<div id="loading">📡 진행진이 대진표를 송출할 때까지 대기 중입니다...</div>`;
             }
         });
 
         function openPlayerProfile(playerName) {
-            tempModalPlayer = playerName;
-            let wins = 0, losses = 0, pts = 0, playedMatches = 0;
-
+            tempModalPlayer = playerName; let wins = 0, losses = 0, pts = 0, playedMatches = 0;
             currentScheduleData.forEach(round => {
                 if (round.matches) {
                     round.matches.forEach(m => {
-                        if (m && m.score_a !== undefined && m.score_b !== undefined && m.score_a !== "" && m.score_b !== "") {
-                            let sa = parseInt(m.score_a) || 0;
-                            let sb = parseInt(m.score_b) || 0;
-                            
-                            let isTeamA = m.team_a.some(p => p.name === playerName);
-                            let isTeamB = m.team_b.some(p => p.name === playerName);
-
-                            if (isTeamA || isTeamB) {
-                                playedMatches++;
-                                if (isTeamA) {
-                                    pts += sa;
-                                    if (sa > sb) wins++; else if (sb > sa) losses++;
-                                } else if (isTeamB) {
-                                    pts += sb;
-                                    if (sb > sa) wins++; else if (sa > sb) losses++;
-                                }
-                            }
+                        if (m && m.score_a && m.score_b) {
+                            let sa = parseInt(m.score_a) || 0; let sb = parseInt(m.score_b) || 0;
+                            let isTeamA = m.team_a.some(p => p.name === playerName); let isTeamB = m.team_b.some(p => p.name === playerName);
+                            if (isTeamA || isTeamB) { playedMatches++; if (isTeamA) { pts += sa; if (sa > sb) wins++; else if (sb > sa) losses++; } else if (isTeamB) { pts += sb; if (sb > sa) wins++; else if (sa > sb) losses++; } }
                         }
                     });
                 }
             });
-
             const winRate = playedMatches > 0 ? Math.round((wins / playedMatches) * 100) : 0;
-
-            document.getElementById('modal-name').innerText = playerName;
-            document.getElementById('modal-record').innerText = `${wins}승 ${losses}패`;
-            document.getElementById('modal-pts').innerText = pts;
-            document.getElementById('modal-winrate').innerText = winRate + '%';
-
+            document.getElementById('modal-name').innerText = playerName; document.getElementById('modal-record').innerText = `${wins}승 ${losses}패`; document.getElementById('modal-pts').innerText = pts; document.getElementById('modal-winrate').innerText = winRate + '%';
             document.getElementById('player-modal').style.display = 'flex';
         }
-
-        function closeModal() {
-            document.getElementById('player-modal').style.display = 'none';
-        }
-
-        function applyModalFilter() {
-            activePlayerFilter = tempModalPlayer;
-            closeModal();
-            document.getElementById('reset-filter-btn').style.display = 'block';
-            renderSchedule();
-        }
-
-        function resetFilter() {
-            activePlayerFilter = null;
-            document.getElementById('reset-filter-btn').style.display = 'none';
-            renderSchedule();
-        }
+        function closeModal() { document.getElementById('player-modal').style.display = 'none'; }
+        function applyModalFilter() { activePlayerFilter = tempModalPlayer; closeModal(); document.getElementById('reset-filter-btn').style.display = 'block'; renderSchedule(); }
+        function resetFilter() { activePlayerFilter = null; document.getElementById('reset-filter-btn').style.display = 'none'; renderSchedule(); }
 
         function calculateStats(scheduleList) {
-            let blueWins = 0, redWins = 0;
-            let pStats = {}; 
-
+            let blueWins = 0, redWins = 0; let pStats = {}; 
             scheduleList.forEach(round => {
                 if (round.matches) {
                     round.matches.forEach(m => {
-                        if (m && m.score_a !== undefined && m.score_b !== undefined && m.score_a !== "" && m.score_b !== "") {
-                            let sa = parseInt(m.score_a) || 0;
-                            let sb = parseInt(m.score_b) || 0;
-
-                            if (sa > sb) blueWins++;
-                            else if (sb > sa) redWins++;
-
-                            m.team_a.forEach(p => {
-                                if (!pStats[p.name]) pStats[p.name] = { wins: 0, pts: 0 };
-                                pStats[p.name].pts += sa;
-                                if (sa > sb) pStats[p.name].wins++;
-                            });
-                            m.team_b.forEach(p => {
-                                if (!pStats[p.name]) pStats[p.name] = { wins: 0, pts: 0 };
-                                pStats[p.name].pts += sb;
-                                if (sb > sa) pStats[p.name].wins++;
-                            });
+                        if (m && m.score_a && m.score_b) {
+                            let sa = parseInt(m.score_a) || 0; let sb = parseInt(m.score_b) || 0;
+                            if (sa > sb) blueWins++; else if (sb > sa) redWins++;
+                            m.team_a.forEach(p => { if (!pStats[p.name]) pStats[p.name] = { wins: 0, pts: 0 }; pStats[p.name].pts += sa; if (sa > sb) pStats[p.name].wins++; });
+                            m.team_b.forEach(p => { if (!pStats[p.name]) pStats[p.name] = { wins: 0, pts: 0 }; pStats[p.name].pts += sb; if (sb > sa) pStats[p.name].wins++; });
                         }
                     });
                 }
             });
-
-            let sortedPlayers = Object.keys(pStats).map(name => ({
-                name: name, wins: pStats[name].wins, pts: pStats[name].pts
-            })).sort((a, b) => {
-                if (b.wins !== a.wins) return b.wins - a.wins;
-                return b.pts - a.pts;
-            });
-
+            let sortedPlayers = Object.keys(pStats).map(name => ({ name: name, wins: pStats[name].wins, pts: pStats[name].pts })).sort((a, b) => { if (b.wins !== a.wins) return b.wins - a.wins; return b.pts - a.pts; });
             return { blueWins, redWins, top3: sortedPlayers.slice(0, 3) };
         }
 
         function renderSchedule() {
             container.innerHTML = '';
+            
+            // 💡 [새 기능] 우승 배너 렌더링 (대회 종료 시점)
+            if (currentState === 'finished' && currentWinner && !activePlayerFilter) {
+                let bannerText = currentWinner === 'A' ? "🏆 청팀(A팀) 최종 우승! 🏆" : (currentWinner === 'B' ? "🏆 홍팀(B팀) 최종 우승! 🏆" : "🤝 최종 결과 무승부! 🤝");
+                container.innerHTML += `
+                    <div class="winner-banner" style="display:block;">
+                        ${bannerText}
+                        <div class="winner-subtitle">이번 대회에 참가하신 모든 분들 수고하셨습니다!</div>
+                    </div>
+                `;
+            }
+
             const makeClickable = (name) => `<span class="clickable-name" onclick="openPlayerProfile('${name}')">${name}</span>`;
 
-            // 1. 대시보드
             if (!activePlayerFilter) {
                 const stats = calculateStats(currentScheduleData);
                 let mvpHtml = '';
-                
                 if (stats.top3.length > 0 && (stats.top3[0].wins > 0 || stats.top3[0].pts > 0)) {
                     const medals = ['🥇', '🥈', '🥉'];
-                    stats.top3.forEach((p, i) => {
-                        mvpHtml += `
-                            <div class="mvp-item" onclick="openPlayerProfile('${p.name}')">
-                                <span>${medals[i]} ${p.name}</span>
-                                <span class="mvp-stats">${p.wins}승 (${p.pts}득점)</span>
-                            </div>`;
-                    });
-                } else {
-                    mvpHtml = `<div style="font-size:12px; color:#999;">아직 입력된 점수가 없습니다.</div>`;
-                }
+                    stats.top3.forEach((p, i) => { mvpHtml += `<div class="mvp-item" onclick="openPlayerProfile('${p.name}')"><span>${medals[i]} ${p.name}</span><span class="mvp-stats">${p.wins}승 (${p.pts}득점)</span></div>`; });
+                } else { mvpHtml = `<div style="font-size:12px; color:#999;">아직 입력된 점수가 없습니다.</div>`; }
 
                 container.innerHTML += `
                     <div class="dashboard">
                         <div class="score-title">🏆 대회 종합 누적 승점</div>
-                        <div class="score-board">
-                            <span class="score-blue">🔵 ${stats.blueWins}승</span>
-                            <span class="score-vs">VS</span>
-                            <span class="score-red">🔴 ${stats.redWins}승</span>
-                        </div>
+                        <div class="score-board"><span class="score-blue">🔵 ${stats.blueWins}승</span><span class="score-vs">VS</span><span class="score-red">🔴 ${stats.redWins}승</span></div>
                         <div class="mvp-title">👑 실시간 MVP TOP 3 (클릭 시 전적)</div>
                         <div class="mvp-list">${mvpHtml}</div>
                     </div>
                 `;
             }
 
-            // 2. 대진표
             currentScheduleData.forEach(round => {
                 let roundMatches = '';
-
-                if (round.is_event) {
-                    if (!activePlayerFilter) roundMatches = `<div class="event-box">⭐ 특별 이벤트 타임 (공지 및 휴식) ⭐</div>`;
-                } else if (round.error) {
-                    if (!activePlayerFilter) roundMatches = `<div class="event-box" style="background:#f8d7da; color:#721c24;">⚠️ ${round.error}</div>`;
-                } else {
+                if (round.is_event) { if (!activePlayerFilter) roundMatches = `<div class="event-box">⭐ 특별 이벤트 타임 (공지 및 휴식) ⭐</div>`; } 
+                else if (round.error) { if (!activePlayerFilter) roundMatches = `<div class="event-box" style="background:#f8d7da; color:#721c24;">⚠️ ${round.error}</div>`; } 
+                else {
                     let matchListHtml = '';
-                    
                     for (let c = 0; c < 4; c++) {
                         const match = round.matches[c];
                         if (match && match.team_a.length === 2 && match.team_b.length === 2) {
-                            
-                            const isMyMatch = activePlayerFilter && (
-                                match.team_a.some(p => p.name === activePlayerFilter) || 
-                                match.team_b.some(p => p.name === activePlayerFilter)
-                            );
-
+                            const isMyMatch = activePlayerFilter && (match.team_a.some(p => p.name === activePlayerFilter) || match.team_b.some(p => p.name === activePlayerFilter));
                             if (activePlayerFilter && !isMyMatch) continue;
+                            let sa = match.score_a !== undefined && match.score_a !== "" ? match.score_a : "-";
+                            let sb = match.score_b !== undefined && match.score_b !== "" ? match.score_b : "-";
+                            let saClass = (sa !== "-" && parseInt(sa) > parseInt(sb)) ? "score-win" : ""; let sbClass = (sb !== "-" && parseInt(sb) > parseInt(sa)) ? "score-win" : "";
+                            let rowWinClass = ""; if (sa !== "-" && sb !== "-") { if (parseInt(sa) > parseInt(sb)) rowWinClass = "win-a"; else if (parseInt(sb) > parseInt(sa)) rowWinClass = "win-b"; }
 
-                            let sa = match.score_a !== undefined ? match.score_a : "-";
-                            let sb = match.score_b !== undefined ? match.score_b : "-";
-                            let saClass = (sa !== "-" && parseInt(sa) > parseInt(sb)) ? "score-win" : "";
-                            let sbClass = (sb !== "-" && parseInt(sb) > parseInt(sa)) ? "score-win" : "";
-
-                            // 💡 승패에 따른 배경 클래스 판별 로직 추가
-                            let rowWinClass = "";
-                            if (sa !== "-" && sb !== "-") {
-                                if (parseInt(sa) > parseInt(sb)) rowWinClass = "win-a";
-                                else if (parseInt(sb) > parseInt(sa)) rowWinClass = "win-b";
-                            }
-
-                            // 내 경기면 my-match 클래스 부여, 이긴 팀 배경색 클래스 부여
                             matchListHtml += `
                                 <div class="match-row ${isMyMatch ? 'my-match' : ''} ${rowWinClass}">
                                     <div class="court-badge">${c + 1}코트</div>
                                     <div class="teams-container">
-                                        <div class="team team-a">
-                                            <span>🔵 ${makeClickable(match.team_a[0].name)} & ${makeClickable(match.team_a[1].name)}</span>
-                                            <span class="score-display ${saClass}">${sa}</span>
-                                        </div>
+                                        <div class="team team-a"><span>🔵 ${makeClickable(match.team_a[0].name)} & ${makeClickable(match.team_a[1].name)}</span><span class="score-display ${saClass}">${sa}</span></div>
                                         <div class="vs-text">VS <span class="category-badge">${match.category}</span></div>
-                                        <div class="team team-b">
-                                            <span>🔴 ${makeClickable(match.team_b[0].name)} & ${makeClickable(match.team_b[1].name)}</span>
-                                            <span class="score-display ${sbClass}">${sb}</span>
-                                        </div>
+                                        <div class="team team-b"><span>🔴 ${makeClickable(match.team_b[0].name)} & ${makeClickable(match.team_b[1].name)}</span><span class="score-display ${sbClass}">${sb}</span></div>
                                     </div>
                                 </div>
                             `;
-                        } else {
-                            if (!activePlayerFilter) { 
-                                matchListHtml += `
-                                    <div class="match-row">
-                                        <div class="court-badge">${c + 1}코트</div>
-                                        <div class="teams-container"><span class="empty-text">빈 코트</span></div>
-                                    </div>
-                                `;
-                            }
-                        }
+                        } else { if (!activePlayerFilter) { matchListHtml += `<div class="match-row"><div class="court-badge">${c + 1}코트</div><div class="teams-container"><span class="empty-text">빈 코트</span></div></div>`; } }
                     }
                     roundMatches = matchListHtml;
                 }
-
                 if (roundMatches) {
-                    const roundBox = document.createElement('div');
-                    roundBox.className = 'round-box';
-                    roundBox.innerHTML = `
-                        <div class="round-title">${round.time} (${round.round}회차)</div>
-                        <div class="match-list">${roundMatches}</div>
-                    `;
+                    const roundBox = document.createElement('div'); roundBox.className = 'round-box';
+                    roundBox.innerHTML = `<div class="round-title">${round.time} (${round.round}회차)</div><div class="match-list">${roundMatches}</div>`;
                     container.appendChild(roundBox);
                 }
             });
-
-            if (activePlayerFilter && container.innerHTML === '') {
-                container.innerHTML = `<div id="loading">조회된 경기 일정이 없습니다.</div>`;
-            }
+            if (activePlayerFilter && container.innerHTML === '') { container.innerHTML = `<div id="loading">조회된 경기 일정이 없습니다.</div>`; }
         }
     </script>
 </body>

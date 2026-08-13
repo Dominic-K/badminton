@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>배드민턴 클라우드 관리자 시스템</title>
-    <!-- 💡 서버 저장을 위해 파이어베이스 연결 추가 -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -36,27 +35,18 @@
     </style>
 </head>
 <body>
-
     <div class="header">
         <h2>🏆 <span id="dynamic-club-name">클럽이름</span> 클라우드 관리자 시스템 🏆</h2>
         <p>클럽 총무 전용 대시보드</p>
     </div>
-
     <div class="container">
-        <!-- 왼쪽: 선수 목록 -->
         <div class="left-panel">
             <h3>👥 출전 선수 명단 <span id="sync-status" style="font-size:12px; color:green; font-weight:normal;">(서버 동기화 됨)</span></h3>
             <table>
-                <thead>
-                    <tr><th>이름</th><th>성별</th><th>수준</th><th>늦참</th><th>조퇴</th><th>최소보장</th><th>지정파트너</th><th>기피파트너</th></tr>
-                </thead>
-                <tbody id="player-list">
-                    <tr><td colspan="8">등록된 선수가 없습니다.</td></tr>
-                </tbody>
+                <thead><tr><th>이름</th><th>성별</th><th>수준</th><th>늦참</th><th>조퇴</th><th>최소보장</th><th>지정파트너</th><th>기피파트너</th></tr></thead>
+                <tbody id="player-list"><tr><td colspan="8">등록된 선수가 없습니다.</td></tr></tbody>
             </table>
         </div>
-
-        <!-- 오른쪽: 선수 등록 폼 -->
         <div class="right-panel">
             <h3>⚙️ 선수 등록 / 수정</h3>
             <div class="form-row"><label>이름</label><input type="text" id="name" placeholder="이름 입력"></div>
@@ -67,14 +57,11 @@
             <div class="form-row"><label>최소 보장(경기)</label><input type="number" id="min_games" value="0" min="0" max="10"></div>
             <div class="form-row"><label>지정 파트너</label><input type="text" id="pref_partner" placeholder="이름 입력"></div>
             <div class="form-row"><label>기피 파트너</label><input type="text" id="avoid_partner" placeholder="이름 입력"></div>
-
             <button class="btn btn-add">➕ 선수 신규 등록</button>
             <button class="btn btn-edit">✏️ 선택 선수 정보 수정</button>
             <button class="btn btn-delete">❌ 선택 삭제</button>
         </div>
     </div>
-
-    <!-- 하단: 매칭 환경 설정 -->
     <div class="bottom-panel">
         <div class="settings-box">
             <div class="settings-row"><label>⏱️ 대회 시간 :</label><input type="time" id="start_time" value="06:00"> ~ <input type="time" id="end_time" value="08:30"> &nbsp;|&nbsp; <label>1경기 진행:</label> <input type="number" id="match_duration" value="13" style="width: 50px;"> 분</div>
@@ -86,21 +73,11 @@
         </div>
     </div>
 
-<script>
-        // 파이어베이스 세팅
-        const firebaseConfig = {
-            apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ",
-            authDomain: "badminton-ed485.firebaseapp.com",
-            projectId: "badminton-ed485",
-            storageBucket: "badminton-ed485.firebasestorage.app",
-            messagingSenderId: "1021547725240",
-            appId: "1:1021547725240:web:099bf98b77db2965d84f4d"
-        };
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyB95N1y6-uAXUp19Quzv08_yqmRpIlzZlQ", authDomain: "badminton-ed485.firebaseapp.com", projectId: "badminton-ed485", storageBucket: "badminton-ed485.firebasestorage.app", messagingSenderId: "1021547725240", appId: "1:1021547725240:web:099bf98b77db2965d84f4d" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth(); // 💡 해결 핵심 1: 인증 모듈 스위치 켜기!
+        const db = firebase.firestore(); const auth = firebase.auth(); 
 
-        // 클럽 인증
         const clubId = localStorage.getItem('clubId');
         const clubName = localStorage.getItem('clubName');
         if (!clubId) { window.location.href = "index.html"; }
@@ -108,117 +85,51 @@
 
         const LS_PLAYERS_KEY = clubId + '_players';
         const LS_SETTINGS_KEY = clubId + '_settings';
+        const LS_STATE_KEY = clubId + '_state'; // 💡 상태 키 추가
 
-        let players = [];
-        let editingPlayerName = null;
+        let players = []; let editingPlayerName = null;
 
-        // 설정값 불러오기
         const savedSettings = localStorage.getItem(LS_SETTINGS_KEY);
         if (savedSettings) {
             const s = JSON.parse(savedSettings);
-            document.getElementById('start_time').value = s.start_time || "06:00";
-            document.getElementById('end_time').value = s.end_time || "08:30";
-            document.getElementById('match_duration').value = s.match_duration || 15; 
-            document.getElementById('use_event').checked = s.use_event !== false;
-            document.getElementById('ev_start_time').value = s.ev_start_time || "07:00";
-            document.getElementById('ev_end_time').value = s.ev_end_time || "07:15";
-            document.getElementById('use_md').checked = s.use_md !== false;
-            document.getElementById('use_wd').checked = s.use_wd !== false;
-            document.getElementById('use_mix').checked = s.use_mix !== false;
-        } else {
-            document.getElementById('match_duration').value = 15;
-        }
+            document.getElementById('start_time').value = s.start_time || "06:00"; document.getElementById('end_time').value = s.end_time || "08:30"; document.getElementById('match_duration').value = s.match_duration || 15; 
+            document.getElementById('use_event').checked = s.use_event !== false; document.getElementById('ev_start_time').value = s.ev_start_time || "07:00"; document.getElementById('ev_end_time').value = s.ev_end_time || "07:15";
+            document.getElementById('use_md').checked = s.use_md !== false; document.getElementById('use_wd').checked = s.use_wd !== false; document.getElementById('use_mix').checked = s.use_mix !== false;
+        } else { document.getElementById('match_duration').value = 15; }
 
-        // 💡 해결 핵심 2: 로그인 상태가 완벽히 로딩된 후 서버와 통신 시작
         auth.onAuthStateChanged((user) => {
             if (user) {
-                // 출입증 확인 완료! 파이어베이스 '실시간(onSnapshot)' 강제 동기화 시작
                 db.collection("clubs").doc(clubId).onSnapshot(doc => {
-                    if (doc.exists && doc.data().roster) {
-                        players = doc.data().roster;
-                        localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); 
-                        renderTable();
-                    } else {
-                        const savedPlayers = localStorage.getItem(LS_PLAYERS_KEY);
-                        if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); }
-                    }
+                    if (doc.exists && doc.data().roster) { players = doc.data().roster; localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); renderTable(); } 
+                    else { const savedPlayers = localStorage.getItem(LS_PLAYERS_KEY); if (savedPlayers) { players = JSON.parse(savedPlayers); renderTable(); } }
                 });
-            } else {
-                alert("보안 세션이 만료되었습니다. 다시 로그인해주세요.");
-                window.location.href = "index.html";
-            }
+            } else { alert("보안 세션이 만료되었습니다. 다시 로그인해주세요."); window.location.href = "index.html"; }
         });
 
-        document.querySelector('.btn-add').addEventListener('click', addPlayer);
-        document.querySelector('.btn-edit').addEventListener('click', editPlayer);
-        document.querySelector('.btn-delete').addEventListener('click', deletePlayer);
-        document.querySelector('.btn-generate').addEventListener('click', generateMatches);
+        document.querySelector('.btn-add').addEventListener('click', addPlayer); document.querySelector('.btn-edit').addEventListener('click', editPlayer); document.querySelector('.btn-delete').addEventListener('click', deletePlayer); document.querySelector('.btn-generate').addEventListener('click', generateMatches);
 
         function renderTable() {
-            const tbody = document.getElementById('player-list');
-            tbody.innerHTML = '';
+            const tbody = document.getElementById('player-list'); tbody.innerHTML = '';
             if (players.length === 0) { tbody.innerHTML = '<tr><td colspan="8">등록된 선수가 없습니다.</td></tr>'; return; }
             players.sort((a, b) => a.name.localeCompare(b.name));
             players.forEach(p => {
-                const tr = document.createElement('tr');
-                tr.style.cursor = 'pointer';
-                tr.onclick = () => loadPlayerToForm(p);
+                const tr = document.createElement('tr'); tr.style.cursor = 'pointer'; tr.onclick = () => loadPlayerToForm(p);
                 tr.innerHTML = `<td><b>${p.name}</b></td><td>${p.gender}</td><td>${p.skill}</td><td>${p.late_min > 0 ? p.late_min + '분' : '-'}</td><td>${p.early_min > 0 ? p.early_min + '분' : '-'}</td><td>${p.min_games > 0 ? p.min_games + '경기' : '-'}</td><td style="color:blue;">${p.pref_partner || '-'}</td><td style="color:red;">${p.avoid_partner || '-'}</td>`;
                 tbody.appendChild(tr);
             });
         }
-
-        function loadPlayerToForm(p) {
-            document.getElementById('name').value = p.name; document.getElementById('gender').value = p.gender; document.getElementById('skill').value = p.skill; document.getElementById('late_min').value = p.late_min; document.getElementById('early_min').value = p.early_min; document.getElementById('min_games').value = p.min_games; document.getElementById('pref_partner').value = p.pref_partner || ''; document.getElementById('avoid_partner').value = p.avoid_partner || '';
-            editingPlayerName = p.name;
-        }
-
-        function addPlayer() {
-            const name = document.getElementById('name').value.trim();
-            if (!name) return alert("이름을 입력해주세요!");
-            if (players.some(p => p.name === name)) return alert("이미 등록된 이름입니다.");
-            players.push({ name: name, gender: document.getElementById('gender').value, skill: parseInt(document.getElementById('skill').value) || 15, late_min: parseInt(document.getElementById('late_min').value) || 0, early_min: parseInt(document.getElementById('early_min').value) || 0, min_games: parseInt(document.getElementById('min_games').value) || 0, pref_partner: document.getElementById('pref_partner').value.trim(), avoid_partner: document.getElementById('avoid_partner').value.trim() });
-            saveAndRefresh(); clearForm();
-        }
-
-        function editPlayer() {
-            if (!editingPlayerName) return alert("선택된 선수가 없습니다.");
-            const newName = document.getElementById('name').value.trim();
-            if (newName !== editingPlayerName && players.some(p => p.name === newName)) return alert("이미 존재하는 이름입니다.");
-            const index = players.findIndex(p => p.name === editingPlayerName);
-            if (index !== -1) {
-                players[index] = { name: newName, gender: document.getElementById('gender').value, skill: parseInt(document.getElementById('skill').value) || 15, late_min: parseInt(document.getElementById('late_min').value) || 0, early_min: parseInt(document.getElementById('early_min').value) || 0, min_games: parseInt(document.getElementById('min_games').value) || 0, pref_partner: document.getElementById('pref_partner').value.trim(), avoid_partner: document.getElementById('avoid_partner').value.trim() };
-            }
-            saveAndRefresh(); clearForm();
-        }
-
-        function deletePlayer() {
-            if (!editingPlayerName) return;
-            if (confirm("정말 삭제하시겠습니까?")) {
-                players = players.filter(p => p.name !== editingPlayerName);
-                saveAndRefresh(); clearForm();
-            }
-        }
-
-        function saveAndRefresh() {
-            renderTable();
-            localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players));
-            document.getElementById('sync-status').innerText = "(서버 동기화 중...)";
-            document.getElementById('sync-status').style.color = "red";
-            db.collection("clubs").doc(clubId).set({ roster: players }, { merge: true }).then(() => {
-                document.getElementById('sync-status').innerText = "(서버 동기화 완료)";
-                document.getElementById('sync-status').style.color = "green";
-            });
-        }
-
-        function clearForm() {
-            document.getElementById('name').value = ''; document.getElementById('pref_partner').value = ''; document.getElementById('avoid_partner').value = ''; editingPlayerName = null;
-        }
-
+        function loadPlayerToForm(p) { document.getElementById('name').value = p.name; document.getElementById('gender').value = p.gender; document.getElementById('skill').value = p.skill; document.getElementById('late_min').value = p.late_min; document.getElementById('early_min').value = p.early_min; document.getElementById('min_games').value = p.min_games; document.getElementById('pref_partner').value = p.pref_partner || ''; document.getElementById('avoid_partner').value = p.avoid_partner || ''; editingPlayerName = p.name; }
+        function addPlayer() { const name = document.getElementById('name').value.trim(); if (!name) return alert("이름을 입력해주세요!"); if (players.some(p => p.name === name)) return alert("이미 등록된 이름입니다."); players.push({ name: name, gender: document.getElementById('gender').value, skill: parseInt(document.getElementById('skill').value) || 15, late_min: parseInt(document.getElementById('late_min').value) || 0, early_min: parseInt(document.getElementById('early_min').value) || 0, min_games: parseInt(document.getElementById('min_games').value) || 0, pref_partner: document.getElementById('pref_partner').value.trim(), avoid_partner: document.getElementById('avoid_partner').value.trim() }); saveAndRefresh(); clearForm(); }
+        function editPlayer() { if (!editingPlayerName) return alert("선택된 선수가 없습니다."); const newName = document.getElementById('name').value.trim(); if (newName !== editingPlayerName && players.some(p => p.name === newName)) return alert("이미 존재하는 이름입니다."); const index = players.findIndex(p => p.name === editingPlayerName); if (index !== -1) { players[index] = { name: newName, gender: document.getElementById('gender').value, skill: parseInt(document.getElementById('skill').value) || 15, late_min: parseInt(document.getElementById('late_min').value) || 0, early_min: parseInt(document.getElementById('early_min').value) || 0, min_games: parseInt(document.getElementById('min_games').value) || 0, pref_partner: document.getElementById('pref_partner').value.trim(), avoid_partner: document.getElementById('avoid_partner').value.trim() }; } saveAndRefresh(); clearForm(); }
+        function deletePlayer() { if (!editingPlayerName) return; if (confirm("정말 삭제하시겠습니까?")) { players = players.filter(p => p.name !== editingPlayerName); saveAndRefresh(); clearForm(); } }
+        function saveAndRefresh() { renderTable(); localStorage.setItem(LS_PLAYERS_KEY, JSON.stringify(players)); if(auth.currentUser){ document.getElementById('sync-status').innerText = "(서버 동기화 중...)"; document.getElementById('sync-status').style.color = "red"; auth.currentUser.getIdToken(true).then(() => { db.collection("clubs").doc(clubId).set({ roster: players }, { merge: true }).then(() => { document.getElementById('sync-status').innerText = "(서버 동기화 완료)"; document.getElementById('sync-status').style.color = "green"; }); }); } }
+        function clearForm() { document.getElementById('name').value = ''; document.getElementById('pref_partner').value = ''; document.getElementById('avoid_partner').value = ''; editingPlayerName = null; }
+        
         function generateMatches() {
             if (players.length < 16) return alert(`최소 16명 필요!`);
             const settings = { start_time: document.getElementById('start_time').value, end_time: document.getElementById('end_time').value, match_duration: parseInt(document.getElementById('match_duration').value) || 13, use_event: document.getElementById('use_event').checked, ev_start_time: document.getElementById('ev_start_time').value, ev_end_time: document.getElementById('ev_end_time').value, use_md: document.getElementById('use_md').checked, use_wd: document.getElementById('use_wd').checked, use_mix: document.getElementById('use_mix').checked };
             localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); 
+            localStorage.setItem(LS_STATE_KEY, 'draft'); // 💡 대진표 새로 짤 때 무조건 '준비' 상태로 초기화
             window.location.href = "match.html";
         }
     </script>
